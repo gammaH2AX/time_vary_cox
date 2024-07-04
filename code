@@ -1,0 +1,107 @@
+library(dplyr)
+library(survival)
+library(lubridate)
+library(coxme)
+library(splines)
+
+
+  data <- readRDS()
+  
+  survSplit(Surv(Survival_months,Status)~.,data=data,cut=seq(0,max(data$Survival_months),by=12),
+            episode = 'timegroup',end='tend') -> result
+  
+  
+  result %>%
+    as_tibble() -> result2
+  
+  
+  seqDate <- seq.Date(from=as_date('2000-01-01'),to=as_date('2017-01-01'),by='1 month')
+  idlist=unique(result2$PatientID)
+  
+  
+  expand.grid(pid=idlist,date=seqDate) %>%
+    as_tibble() %>%
+    arrange(pid) -> date_f
+  
+  
+  data %>%
+    select(pid=PatientID,start_date,end_date) %>%
+    right_join(date_f,by='pid') -> date_f
+  
+  
+  date_f %>%
+    as_tibble() %>%
+    mutate(start_date=as_date(paste0(start_date,'-01')),
+           end_date=as_date(paste0(end_date,'-01'))) -> date_f
+  
+  
+  date_f %>%
+    dplyr::filter(date>=start_date,date<=end_date) -> date_f
+  
+  
+  date_f %>%
+    mutate(start_year=year(start_date),
+           start_month=month(start_date),
+           date_year=year(date),
+           date_month=month(date)) -> date_f
+  
+  date_f %>%
+    dplyr::filter(start_month==date_month) -> date_f
+  
+  date_f %>%
+    distinct(pid,date_year,.keep_all = T) -> date_f
+  
+  date_f %>%
+    select(sdate=date) %>%
+    cbind(.,result2) %>%
+    relocate(PatientID,sdate,start_date,end_date,tstart,tend,Status) -> result2
+  
+  result2$sdate1 <- substr(result2$sdate, 1, 7)
+  result2$edate1 <- paste(substr(result2$sdate1, 1, 4), substr(result2$end_date, 5, 7), sep = "")
+  
+  
+  result2$sdateYM<-substr(result2$sdate,1,7)
+  
+  result2_exposure<-left_join(result2,exposure,c("GEOID",edate1="cal_date"))
+  result2_exposure$year<- substr(result2_exposure$sdate,1,4)
+  result2_exposure<-left_join(result2_exposure,covariate,c("GEOID",year="Year"))
+  
+  county$county_fips <- as.character(county$county_fips)
+  county$county_fips <- gsub("\\s+", "", county$county_fips)
+  county$county_fips <- sprintf("%05d", as.numeric(county$county_fips))  
+  result2_exposure<-left_join(result2_exposure,county,c(GEOID= "county_fips"))
+  
+  
+  
+  
+  result2_exposure$Race_recode <- as.factor(result2_exposure$Race_recode)
+  result2_exposure$Age <- as.factor(result2_exposure$Age)
+  result2_exposure$Sex <- as.factor(result2_exposure$Sex)
+  result2_exposure$state<- as.factor(result2_exposure$state)
+  result2_exposure$Marital_status_at_diagnosis<- as.factor(result2_exposure$Marital_status_at_diagnosis)
+  result2_exposure$Classification <- as.factor(result2_exposure$Classification)
+  
+
+  result2_exposure$Education.index<-as.numeric(result2_exposure$Education.index)
+  result2_exposure$Median.household.income..in.tens..inflation.adj.to.2021 <- as.numeric(result2_exposure$Median.household.income..in.tens..inflation.adj.to.2021)
+  result2_exposure$X..Persons..150..of.poverty <- as.numeric(result2_exposure$X..Persons..150..of.poverty)
+  result2_exposure$X..Unemployed <- as.numeric(result2_exposure$X..Unemployed)
+  result2_exposure$physical<- as.numeric(result2_exposure$physical)
+  result2_exposure$drink<- as.numeric(result2_exposure$drink)
+  result2_exposure$nosmoke <- as.numeric(result2_exposure$nosmoke)
+  result2_exposure$year <- as.factor(result2_exposure$year)
+  result2_exposure$SEER_registry <- as.factor(result2_exposure$SEER_registry)
+  
+
+    
+    mod <- coxph(Surv(tstart,tend, Status) ~ 
+                   traffic_PM25_108_month
+                 + Race_recode +Age+ Sex+
+                 as.factor(year)+ 
+                 as.factor(SEER_registry) +
+                   Classification+ Marital_status_at_diagnosis+
+                   X..Unemployed+X..Persons..150..of.poverty+Education.index+
+                   Median.household.income..in.tens..inflation.adj.to.2021 + 
+                   ns(temp_108_month,df=3) +  ns(relative_humi_108_month,df=3) +
+                   physical+drink+nosmoke  ,
+              data = result2_exposure)
