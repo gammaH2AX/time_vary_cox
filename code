@@ -75,7 +75,7 @@ library(splines)
   
   
   result2_exposure$Race_recode <- as.factor(result2_exposure$Race_recode)
-  result2_exposure$Age <- as.factor(result2_exposure$Age)
+
   result2_exposure$Sex <- as.factor(result2_exposure$Sex)
   result2_exposure$state<- as.factor(result2_exposure$state)
   result2_exposure$Marital_status_at_diagnosis<- as.factor(result2_exposure$Marital_status_at_diagnosis)
