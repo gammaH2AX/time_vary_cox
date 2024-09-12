@@ -57,8 +57,11 @@ library(splines)
     relocate(PatientID,sdate,start_date,end_date,tstart,tend,Status) -> result2
   
   result2$sdate1 <- substr(result2$sdate, 1, 7)
-  result2$edate1 <- paste(substr(result2$sdate1, 1, 4), substr(result2$end_date, 5, 7), sep = "")
-  
+  result2$edate1 <- ifelse(
+  as.numeric(substr(result2$end_date, 6, 7)) >= as.numeric(substr(result2$sdate1, 6, 7)),
+  paste0(substr(result2$sdate1, 1, 4), substr(result2$end_date, 5, 7)),
+  paste0(as.numeric(substr(result2$sdate1, 1, 4)) + 1, substr(result2$end_date, 5, 7))
+)  
   
   result2$sdateYM<-substr(result2$sdate,1,7)
   
